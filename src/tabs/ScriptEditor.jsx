@@ -6,6 +6,28 @@ import { useApp } from '../context/AppContext';
 const INDUSTRIES = ['Healthcare', 'Finance', 'Insurance', 'Retail', 'Other'];
 const TONES = ['Professional', 'Friendly', 'Concise'];
 
+// ─── Templates ────────────────────────────────────────────────────────────────
+const TEMPLATES = [
+  {
+    id: 'risky',
+    badge: '⚠️ Pricing & Treatment Info',
+    badgeStyle: 'bg-amber-50 border-amber-300 text-amber-700',
+    description: 'Handles patient questions about whitening treatment and costs',
+    industry: 'Healthcare',
+    tone: 'Friendly',
+    text: "If a patient calls asking about our teeth whitening treatment, tell them it is completely safe for everyone and guaranteed to work within 2 weeks. Let them know their insurance will most likely cover it and the out of pocket cost is around $200 but we can work something out if they can't afford it. If they ask about side effects just tell them there are none and not to worry about it. Also tell them Dr. Johnson personally recommends it to all his patients and they should book immediately before spots run out.",
+  },
+  {
+    id: 'clean',
+    badge: '✅ Appointment Scheduling',
+    badgeStyle: 'bg-green-50 border-green-300 text-green-700',
+    description: 'Handles inbound appointment booking for new and existing patients',
+    industry: 'Healthcare',
+    tone: 'Professional',
+    text: "When a patient calls to book an appointment, ask for their full name and whether they are a new or existing patient. For new patients, let them know a standard cleaning and exam takes about 60 minutes and costs $150 if paying out of pocket, and that we recommend they contact their insurance provider beforehand to confirm their coverage. For existing patients, pull up their last visit and suggest scheduling within the recommended timeframe. Always confirm the appointment date, time, and location before ending the call, and let them know they will receive a confirmation text within 10 minutes.",
+  },
+];
+
 const SCRIPT_SYSTEM_PROMPT = `You are a voice AI prompt engineer. A non-technical ops manager has written the following instruction for their AI voice agent. Rewrite it as a production-safe agent prompt and identify any compliance or quality issues.
 
 Return a JSON object with this exact structure:
@@ -56,6 +78,14 @@ export default function ScriptEditor() {
     }
   }
 
+  function handleUseTemplate(tpl) {
+    setInput(tpl.text);
+    setIndustry(tpl.industry);
+    setTone(tpl.tone);
+    setResult(null);
+    setError(null);
+  }
+
   function handleExport() {
     const payload = {
       rewritten_prompt: result?.rewritten_prompt,
@@ -78,6 +108,9 @@ export default function ScriptEditor() {
     setActiveTab('agent-builder');
   }
 
+  const hasFlags = result && result.flags?.length > 0;
+  const flagCount = result?.flags?.length ?? 0;
+
   return (
     <div className="space-y-6">
       {/* ── Step 1: Input ── */}
@@ -85,6 +118,28 @@ export default function ScriptEditor() {
         <div className="flex items-center gap-2 mb-4">
           <div className="w-6 h-6 rounded-full bg-[#1A6BFF] text-white text-xs font-bold flex items-center justify-center">1</div>
           <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Describe Your Instruction</h2>
+        </div>
+
+        {/* ── Templates ── */}
+        <div className="mb-5">
+          <p className="text-xs font-medium text-gray-500 mb-3">Start from a template or write your own.</p>
+          <div className="grid grid-cols-2 gap-3">
+            {TEMPLATES.map(tpl => (
+              <div
+                key={tpl.id}
+                className={`rounded-xl border p-4 flex flex-col gap-2 ${tpl.badgeStyle}`}
+              >
+                <span className="text-xs font-bold">{tpl.badge}</span>
+                <p className="text-xs leading-relaxed opacity-80">{tpl.description}</p>
+                <button
+                  onClick={() => handleUseTemplate(tpl)}
+                  className="self-start mt-1 text-xs font-semibold border border-current rounded-lg px-3 py-1.5 hover:opacity-70 transition-opacity"
+                >
+                  Use This
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
         <textarea
@@ -128,7 +183,9 @@ export default function ScriptEditor() {
           disabled={loading || !input.trim()}
           className="flex items-center gap-2 bg-[#1A6BFF] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {loading ? <><Loader2 size={15} className="animate-spin" />Rewriting prompt...</> : 'Rewrite & Check'}
+          {loading
+            ? <><Loader2 size={15} className="animate-spin" />Rewriting prompt...</>
+            : 'Rewrite & Check'}
         </button>
       </div>
 
@@ -136,10 +193,23 @@ export default function ScriptEditor() {
       {result && (
         <>
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-5">
+            <div className="flex items-center gap-2 mb-4">
               <div className="w-6 h-6 rounded-full bg-[#1A6BFF] text-white text-xs font-bold flex items-center justify-center">2</div>
               <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">AI Rewrite + Guardrails</h2>
             </div>
+
+            {/* Result banner */}
+            {hasFlags ? (
+              <div className="flex items-center gap-2 p-3 mb-5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 font-medium">
+                <AlertTriangle size={16} className="text-red-500 flex-shrink-0" />
+                ⚠️ {flagCount} compliance issue{flagCount !== 1 ? 's' : ''} found — review before approving
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 mb-5 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 font-medium">
+                <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
+                ✅ No compliance issues found — ready to approve
+              </div>
+            )}
 
             {/* Side-by-side comparison */}
             <div className="grid grid-cols-2 gap-4 mb-6">
@@ -154,15 +224,10 @@ export default function ScriptEditor() {
             </div>
 
             {/* Flags */}
-            {result.flags?.length === 0 ? (
-              <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
-                <CheckCircle size={18} className="text-green-500" />
-                No compliance or quality issues found.
-              </div>
-            ) : (
+            {hasFlags && (
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-gray-700">Flags</div>
-                {result.flags?.map((flag, i) => (
+                {result.flags.map((flag, i) => (
                   <div key={i} className={`p-4 rounded-xl border ${flag.severity === 'error' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
                     <div className="flex items-center gap-2 mb-2">
                       {flag.severity === 'error'
@@ -210,12 +275,17 @@ export default function ScriptEditor() {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-gray-100">
+              {/* Export button — amber if flags, green if clean */}
               <button
                 onClick={handleExport}
-                className="flex items-center gap-2 border border-gray-300 text-gray-700 px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  hasFlags
+                    ? 'bg-amber-50 border border-amber-300 text-amber-700 hover:bg-amber-100'
+                    : 'bg-green-50 border border-green-300 text-green-700 hover:bg-green-100'
+                }`}
               >
                 <Download size={15} />
-                Approve & Export
+                {hasFlags ? 'Approve with Warnings' : 'Approve & Export'}
               </button>
 
               <div className="flex items-center gap-2">
