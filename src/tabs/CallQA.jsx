@@ -6,8 +6,8 @@ import {
 } from 'recharts';
 import { callClaude, parseJSON } from '../lib/claude';
 import { useApp } from '../context/AppContext';
+import InfoPopover from '../components/InfoPopover';
 
-// ─── Hardcoded Trend Data ─────────────────────────────────────────────────────
 const TREND_DATA = [
   { call: 'Call 1', score: 82 },
   { call: 'Call 2', score: 76 },
@@ -58,12 +58,8 @@ export default function CallQA() {
     setError(null);
     setResult(null);
     try {
-      const text = await callClaude({
-        system: QA_SYSTEM_PROMPT,
-        prompt: `Transcript:\n${transcript}`,
-      });
-      const parsed = parseJSON(text);
-      setResult(parsed);
+      const text = await callClaude({ system: QA_SYSTEM_PROMPT, prompt: `Transcript:\n${transcript}` });
+      setResult(parseJSON(text));
     } catch (e) {
       setError(e.message || 'Something went wrong. Try again.');
     } finally {
@@ -85,7 +81,6 @@ export default function CallQA() {
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Analyze Call Transcript</h2>
 
-        {/* File Drop Zone */}
         <div
           className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-[#1A6BFF] hover:bg-blue-50/30 transition-colors mb-4"
           onClick={() => fileRef.current?.click()}
@@ -96,7 +91,6 @@ export default function CallQA() {
           <input ref={fileRef} type="file" accept=".txt" className="hidden" onChange={handleFileUpload} />
         </div>
 
-        {/* Paste Fallback */}
         <div className="mb-4">
           <label className="block text-xs font-medium text-gray-500 mb-2">Or paste transcript below</label>
           <textarea
@@ -108,9 +102,7 @@ export default function CallQA() {
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            {error}
-          </div>
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
         )}
 
         <button
@@ -118,21 +110,30 @@ export default function CallQA() {
           disabled={loading || !transcript.trim()}
           className="flex items-center gap-2 bg-[#1A6BFF] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
-          {loading ? <><Loader2 size={15} className="animate-spin" />Analyzing call...</> : <><FileText size={15} />Analyze Call</>}
+          {loading
+            ? <><Loader2 size={15} className="animate-spin" />Analyzing call...</>
+            : <><FileText size={15} />Analyze Call</>}
         </button>
       </div>
 
-      {/* ── Results ── */}
+      {/* ── Results / Scorecard ── */}
       {result && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-6">
-          {/* Overall Score */}
+          {/* Scorecard header */}
           <div className="flex items-center gap-6">
             <div className={`w-24 h-24 rounded-full flex flex-col items-center justify-center border-4 ${result.pass ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50'}`}>
               <span className={`text-3xl font-bold ${result.pass ? 'text-green-600' : 'text-red-500'}`}>{result.overall_score}</span>
               <span className={`text-xs font-medium mt-0.5 ${result.pass ? 'text-green-600' : 'text-red-500'}`}>{result.pass ? 'PASS' : 'FAIL'}</span>
             </div>
             <div>
-              <div className="text-lg font-bold text-gray-900">Overall QA Score</div>
+              <div className="flex items-center gap-1.5">
+                <div className="text-lg font-bold text-gray-900">Overall QA Score</div>
+                <InfoPopover
+                  painPoint="Call quality is checked manually by humans listening to recordings — doesn't scale"
+                  intent="Replace subjective human spot-checking with consistent AI scoring"
+                  whatItDoes="Scores every call across 5 categories and flags the exact failure with a fix recommendation"
+                />
+              </div>
               <div className="text-sm text-gray-500">Out of 100 · Target ≥ 80</div>
             </div>
           </div>
@@ -143,10 +144,7 @@ export default function CallQA() {
               <div key={cat.name} className="flex items-center gap-3">
                 <div className="w-32 text-sm text-gray-600 flex-shrink-0">{cat.name}</div>
                 <div className="flex-1 bg-gray-100 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${cat.pass ? 'bg-green-500' : 'bg-red-400'}`}
-                    style={{ width: `${cat.score}%` }}
-                  />
+                  <div className={`h-2 rounded-full ${cat.pass ? 'bg-green-500' : 'bg-red-400'}`} style={{ width: `${cat.score}%` }} />
                 </div>
                 <div className="w-10 text-sm font-semibold text-gray-900 text-right">{cat.score}</div>
                 <span className={`flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${cat.pass ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
@@ -186,7 +184,15 @@ export default function CallQA() {
 
       {/* ── Trend View ── */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-6">QA Score Trend — Last 7 Calls</h2>
+        <div className="flex items-center gap-1.5 mb-6">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">QA Score Trend — Last 7 Calls</h2>
+          <InfoPopover
+            painPoint="No one knows if the agent is improving or getting worse over time"
+            intent="Make performance trajectory visible at a glance"
+            whatItDoes="Charts scores across the last 7 calls against a target threshold so regressions are caught early"
+          />
+        </div>
+
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={TREND_DATA} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
@@ -202,7 +208,14 @@ export default function CallQA() {
 
         {/* Change Log */}
         <div className="mt-6">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">Change Log</h3>
+          <div className="flex items-center gap-1.5 mb-3">
+            <h3 className="text-sm font-semibold text-gray-700">Change Log</h3>
+            <InfoPopover
+              painPoint="Changes are made but no one tracks whether they actually helped"
+              intent="Connect actions to outcomes so the ops manager knows what works"
+              whatItDoes="Links each call score to what was changed before it ran"
+            />
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

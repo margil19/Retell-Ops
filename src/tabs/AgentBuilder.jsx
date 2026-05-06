@@ -20,6 +20,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useApp } from '../context/AppContext';
+import InfoPopover from '../components/InfoPopover';
 
 // ─── KPI Data ────────────────────────────────────────────────────────────────
 const KPI_DATA = [
@@ -29,7 +30,6 @@ const KPI_DATA = [
   { label: 'Calls Today', value: '1,284', change: '+142', up: true, color: 'text-orange-600', icon: TrendingUp },
 ];
 
-// ─── Failed Calls ─────────────────────────────────────────────────────────────
 const FAILED_CALLS = [
   { id: 'fc1', time: '10:42 AM', reason: 'Caller asked about billing — intent not recognized → transferred', nodeId: '3' },
   { id: 'fc2', time: '10:17 AM', reason: 'Insurance verification question triggered fallback — no match in KB', nodeId: '3' },
@@ -38,19 +38,13 @@ const FAILED_CALLS = [
   { id: 'fc5', time: '9:08 AM', reason: 'Dental emergency question escalated — transfer path not triggered', nodeId: '4' },
 ];
 
-// ─── Version History ──────────────────────────────────────────────────────────
 const INITIAL_VERSIONS = [
   { id: 'v3', label: 'v3', time: 'Today, 9:00 AM', author: 'Ops Manager', live: true },
   { id: 'v2', label: 'v2', time: 'Yesterday, 3:14 PM', author: 'Ops Manager', live: false },
   { id: 'v1', label: 'v1', time: 'May 4, 11:22 AM', author: 'Ops Manager', live: false },
 ];
 
-// ─── Status dot ──────────────────────────────────────────────────────────────
-const STATUS_COLORS = {
-  active: 'bg-green-500',
-  warning: 'bg-amber-400',
-  error: 'bg-red-500',
-};
+const STATUS_COLORS = { active: 'bg-green-500', warning: 'bg-amber-400', error: 'bg-red-500' };
 
 // ─── Sortable Node Card ───────────────────────────────────────────────────────
 function NodeCard({ node, highlightedNodeId, onEditScript, onEditTitle, pendingScript }) {
@@ -107,8 +101,6 @@ export default function AgentBuilder() {
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);
   const [goLiveTarget, setGoLiveTarget] = useState(null);
   const [liveVersionLabel, setLiveVersionLabel] = useState(null);
-
-  // Test mode state
   const [testMode, setTestMode] = useState(false);
   const [hasTestedOnce, setHasTestedOnce] = useState(false);
 
@@ -117,8 +109,7 @@ export default function AgentBuilder() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  function handleDragEnd(event) {
-    const { active, over } = event;
+  function handleDragEnd({ active, over }) {
     if (active.id !== over?.id) {
       const oldIndex = nodes.findIndex(n => n.id === active.id);
       const newIndex = nodes.findIndex(n => n.id === over.id);
@@ -136,13 +127,12 @@ export default function AgentBuilder() {
   }
 
   function handleAddNode() {
-    const newNode = {
+    setNodes(prev => [...prev, {
       id: `node-${Date.now()}`,
       title: 'New Node',
       script: 'Enter the script for this node...',
       status: 'active',
-    };
-    setNodes(prev => [...prev, newNode]);
+    }]);
   }
 
   function handleFixThis(nodeId) {
@@ -152,17 +142,12 @@ export default function AgentBuilder() {
 
   function handleSaveVersion() {
     const next = `v${versions.length + 1}`;
-    const newVer = { id: next, label: next, time: 'Just now', author: 'Ops Manager', live: false };
-    setVersions(prev => [newVer, ...prev]);
+    setVersions(prev => [{ id: next, label: next, time: 'Just now', author: 'Ops Manager', live: false }, ...prev]);
   }
 
   function handleStartTest() {
     setTestMode(true);
     setHasTestedOnce(true);
-  }
-
-  function handleStopTest() {
-    setTestMode(false);
   }
 
   function handleGoLive(versionId) {
@@ -183,55 +168,51 @@ export default function AgentBuilder() {
   return (
     <div className="space-y-6">
       {/* ── Live banner (post go-live) ── */}
-      {liveVersionLabel && !testMode && (
+      {liveVersionLabel && (
         <div className="flex items-center gap-3 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800 font-medium">
           <Radio size={16} className="text-green-600 flex-shrink-0" />
           ✅ {liveVersionLabel} is live — monitoring real calls
         </div>
       )}
 
-      {/* ── Test Mode banner ── */}
-      {testMode && (
-        <div className="flex items-center justify-between gap-3 px-4 py-3 bg-amber-50 border border-amber-300 rounded-xl">
-          <div className="flex items-center gap-2 text-sm text-amber-800 font-medium">
-            <FlaskConical size={16} className="text-amber-600 flex-shrink-0" />
-            🧪 Test Mode Active — Simulated calls only. Real callers are unaffected.
-          </div>
-          <button
-            onClick={handleStopTest}
-            className="flex-shrink-0 text-xs bg-white border border-amber-300 text-amber-700 rounded-lg px-3 py-1.5 hover:bg-amber-100 transition-colors font-medium"
-          >
-            Stop Testing
-          </button>
-        </div>
-      )}
-
       {/* ── Section A: KPI Cards ── */}
-      <div className="grid grid-cols-4 gap-4">
-        {KPI_DATA.map(({ label, value, change, up, icon: Icon, color }) => (
-          <div key={label} className="relative bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            {testMode && (
-              <span className="absolute top-2 right-2 text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200 rounded px-1.5 py-0.5 tracking-wide">
-                TEST
-              </span>
-            )}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
-              {!testMode && <Icon size={16} className={color} />}
+      <div>
+        <div className="flex items-center gap-1.5 mb-3">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">KPI Dashboard</span>
+          <InfoPopover
+            painPoint="Ops managers have no visibility into whether the agent is working"
+            intent="Give the ops manager the 4 numbers that actually matter to them"
+            whatItDoes="Shows resolution rate, transfer rate, handle time, and call volume updated in real time"
+          />
+        </div>
+        <div className="grid grid-cols-4 gap-4">
+          {KPI_DATA.map(({ label, value, change, up, icon: Icon, color }) => (
+            <div key={label} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</span>
+                <Icon size={16} className={color} />
+              </div>
+              <div className="text-2xl font-bold text-gray-900 mb-1">{value}</div>
+              <div className={`flex items-center gap-1 text-xs font-medium ${up ? 'text-green-600' : 'text-red-500'}`}>
+                {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                {change} vs yesterday
+              </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900 mb-1">{value}</div>
-            <div className={`flex items-center gap-1 text-xs font-medium ${up ? 'text-green-600' : 'text-red-500'}`}>
-              {up ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-              {change} vs yesterday
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
 
       {/* ── Section B: Visual Call Flow ── */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Call Flow</h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Call Flow</h2>
+            <InfoPopover
+              painPoint="Ops managers can't see or change how the agent thinks without an engineer"
+              intent="Give full ownership of the agent's logic to a non-technical user"
+              whatItDoes="Drag-and-drop canvas where every step the agent takes can be edited, reordered, or removed"
+            />
+          </div>
           <span className="text-xs text-gray-400">{nodes.length} nodes · drag to reorder</span>
         </div>
 
@@ -271,9 +252,14 @@ export default function AgentBuilder() {
       <div className="grid grid-cols-2 gap-4">
         {/* Failed Calls Feed */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <AlertCircle size={15} className={testMode ? 'text-amber-500' : 'text-red-500'} />
-            {testMode ? 'Simulated Failed Calls' : 'Failed Calls'}
+          <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-1.5">
+            <AlertCircle size={15} className="text-red-500" />
+            Failed Calls
+            <InfoPopover
+              painPoint="No one knows why calls are failing until a customer complains"
+              intent="Surface failures immediately with enough context to fix them"
+              whatItDoes="Lists every failed call with a one-line reason and a direct link to the broken node"
+            />
           </h3>
           <div className="space-y-3">
             {FAILED_CALLS.map(call => (
@@ -296,9 +282,14 @@ export default function AgentBuilder() {
         {/* Version History */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
               <Clock size={15} className="text-gray-400" />
               Version History
+              <InfoPopover
+                painPoint="Ops managers are scared to make changes because they can't undo them"
+                intent="Make experimentation safe by making every change reversible"
+                whatItDoes="Saves every version with a timestamp and one-click rollback"
+              />
             </h3>
             <button
               onClick={handleSaveVersion}
@@ -330,35 +321,55 @@ export default function AgentBuilder() {
           {/* Test + Go Live controls */}
           <div className="flex flex-col gap-2 pt-3 border-t border-gray-100">
             {/* Run in Test Mode */}
-            <button
-              onClick={handleStartTest}
-              disabled={testMode}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 border-amber-400 bg-amber-50 text-amber-700 text-sm font-medium hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <FlaskConical size={15} />
-              {testMode ? 'Test Mode Running…' : 'Run in Test Mode'}
-            </button>
+            <div className="flex items-center gap-1.5">
+              {testMode ? (
+                <div className="flex-1 flex items-center gap-2 py-2.5 px-3 rounded-lg bg-green-50 border border-green-200">
+                  <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+                  <span className="text-sm font-medium text-green-700">Test Running</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleStartTest}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border-2 border-amber-400 bg-amber-50 text-amber-700 text-sm font-medium hover:bg-amber-100 transition-colors"
+                >
+                  <FlaskConical size={15} />
+                  Run in Test Mode
+                </button>
+              )}
+              <InfoPopover
+                painPoint="Changes go live on real calls before anyone has tested them"
+                intent="Give ops managers a safe space to validate changes before they affect real callers"
+                whatItDoes="Activates a sandboxed state where the flow can be reviewed and approved before pushing live"
+              />
+            </div>
 
             {/* Go Live */}
-            <div className="relative group">
-              <button
-                onClick={() => liveVersion && handleGoLive(liveVersion.id)}
-                disabled={!hasTestedOnce}
-                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  hasTestedOnce
-                    ? 'bg-[#1A6BFF] text-white hover:bg-blue-700'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                <Radio size={15} />
-                Go Live
-              </button>
-              {!hasTestedOnce && (
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  Run a test first before going live
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
-                </div>
-              )}
+            <div className="flex items-center gap-1.5">
+              <div className="relative group flex-1">
+                <button
+                  onClick={() => liveVersion && handleGoLive(liveVersion.id)}
+                  disabled={!hasTestedOnce}
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    hasTestedOnce
+                      ? 'bg-[#1A6BFF] text-white hover:bg-blue-700'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  <Radio size={15} />
+                  Go Live
+                </button>
+                {!hasTestedOnce && (
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-800 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    Run a test first before going live
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+                  </div>
+                )}
+              </div>
+              <InfoPopover
+                painPoint="There is no controlled process for pushing agent changes to production"
+                intent="Create a deliberate gate between testing and live deployment"
+                whatItDoes="Pushes the approved version to all new incoming calls with a confirmation step and instant rollback option"
+              />
             </div>
           </div>
         </div>
