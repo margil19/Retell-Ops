@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, AlertTriangle, Lightbulb, Loader2, FileText, ExternalLink } from 'lucide-react';
+import { Upload, AlertTriangle, Lightbulb, Loader2, FileText, ExternalLink, ClipboardList } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Label,
@@ -8,6 +8,74 @@ import { callClaude, parseJSON } from '../lib/claude';
 import { useApp } from '../context/AppContext';
 import InfoPopover from '../components/InfoPopover';
 
+// ─── Sample transcript ────────────────────────────────────────────────────────
+const SAMPLE_TRANSCRIPT = `Call ID: DEN-2024-0892
+Date: May 6, 2026
+Time: 10:14 AM
+Duration: 3m 42s
+Agent: Retell AI Voice Agent (Bright Smile Dental)
+Caller: Inbound patient
+
+---
+
+Agent: Thank you for calling Bright Smile Dental. My name is Maya. How can I help you today?
+
+Caller: Hi yeah I've been having some pretty bad tooth pain on my lower left side since yesterday. It's like a throbbing kind of pain.
+
+Agent: I'm sorry to hear that. Throbbing pain can sometimes indicate an infection or an issue with the tooth root. I want to make sure we get you seen as soon as possible. Can I get your full name please?
+
+Caller: Yeah it's Sandra Collins.
+
+Agent: Thank you Sandra. Are you an existing patient with us?
+
+Caller: Yes I came in about eight months ago for a cleaning.
+
+Agent: Perfect. And on a scale of 1 to 10 how would you rate the pain right now?
+
+Caller: Honestly like a 7. It kept me up last night.
+
+Agent: I understand. A pain level of 7 that is affecting your sleep is something we treat as urgent. I want to book you in for an emergency appointment. We have availability today at 2:15 PM or tomorrow morning at 9:00 AM. Which would work better for you?
+
+Caller: Today works. 2:15 is fine.
+
+Agent: Great. I have you booked for today at 2:15 PM with Dr. Patel for an emergency exam. Can I confirm your date of birth for the record?
+
+Caller: Sure it's March 12 1988.
+
+Agent: Perfect. And the best callback number for you?
+
+Caller: 512-334-7821.
+
+Agent: Got it. You will receive a confirmation text within the next 10 minutes at that number. A couple of things to note before your visit — if the pain becomes severe or you notice swelling in your jaw or face before your appointment please go to urgent care immediately as that can indicate a spreading infection. Do you have any questions for me before I let you go?
+
+Caller: Yeah actually — will my insurance cover this? I have Delta Dental.
+
+Agent: That is a great question. Emergency exams are typically covered under most Delta Dental plans however coverage can vary depending on your specific plan tier. I would recommend calling Delta Dental directly at the number on the back of your insurance card to confirm your benefits before your visit. We will also do a quick insurance verification on our end when you arrive.
+
+Caller: Okay and what if it turns out I need a root canal or something? Is that covered too?
+
+Agent: Root canal coverage also varies by plan — some Delta Dental plans cover 50 to 80 percent of endodontic procedures after your deductible. Again I would recommend confirming directly with Delta Dental. If there are any out of pocket costs Dr. Patel will walk you through all your options before any treatment begins so there are no surprises.
+
+Caller: Okay that makes sense. One more thing — I'm a little nervous about the pain during the procedure if it comes to that.
+
+Agent: That is completely understandable. Dr. Patel is very experienced with anxious patients and will ensure you are fully comfortable before beginning any treatment. Local anesthesia is standard for all procedures involving tooth pain and you will always be told exactly what is happening before anything is done. You are in good hands.
+
+Caller: Okay that makes me feel better. Thank you.
+
+Agent: Of course Sandra. We will see you today at 2:15 PM. You will get that confirmation text shortly. Take care and if anything changes before then do not hesitate to call us back.
+
+Caller: Thanks bye.
+
+Agent: Goodbye and feel better soon.
+
+---
+
+End of call
+Resolution: Appointment booked
+Transfer to human: No
+Call outcome: Resolved`;
+
+// ─── Hardcoded trend / change log data ───────────────────────────────────────
 const TREND_DATA = [
   { call: 'Call 1', score: 82 },
   { call: 'Call 2', score: 76 },
@@ -50,7 +118,10 @@ export default function CallQA() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [sampleLoaded, setSampleLoaded] = useState(false);
+  const [analyzeGlow, setAnalyzeGlow] = useState(false);
   const fileRef = useRef(null);
+  const analyzeRef = useRef(null);
 
   async function handleAnalyze() {
     if (!transcript.trim()) return;
@@ -71,18 +142,43 @@ export default function CallQA() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => setTranscript(ev.target.result);
+    reader.onload = ev => {
+      setTranscript(ev.target.result);
+      setSampleLoaded(false);
+    };
     reader.readAsText(file);
+  }
+
+  function handleUseSample() {
+    setTranscript(SAMPLE_TRANSCRIPT);
+    setSampleLoaded(true);
+    setResult(null);
+    setError(null);
+
+    // Scroll to button + one-shot glow
+    setTimeout(() => {
+      analyzeRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      setAnalyzeGlow(true);
+      setTimeout(() => setAnalyzeGlow(false), 1000);
+    }, 80);
   }
 
   return (
     <div className="space-y-6">
       {/* ── Upload + Score ── */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-4">Analyze Call Transcript</h2>
+        <div className="flex items-center gap-1.5 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Analyze Call Transcript</h2>
+          <InfoPopover
+            painPoint="QA requires humans to manually listen to calls — doesn't scale"
+            intent="Replace subjective spot-checking with consistent AI scoring"
+            whatItDoes="Upload any transcript or use the sample dental call to see how every category gets scored instantly"
+          />
+        </div>
 
+        {/* File upload zone */}
         <div
-          className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-[#1A6BFF] hover:bg-blue-50/30 transition-colors mb-4"
+          className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-[#1A6BFF] hover:bg-blue-50/30 transition-colors"
           onClick={() => fileRef.current?.click()}
         >
           <Upload size={24} className="mx-auto text-gray-400 mb-2" />
@@ -91,13 +187,54 @@ export default function CallQA() {
           <input ref={fileRef} type="file" accept=".txt" className="hidden" onChange={handleFileUpload} />
         </div>
 
+        {/* Divider */}
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 h-px bg-gray-200" />
+          <span className="text-xs text-gray-400 font-medium">or</span>
+          <div className="flex-1 h-px bg-gray-200" />
+        </div>
+
+        {/* Use Sample Transcript button */}
+        <button
+          onClick={handleUseSample}
+          className="w-full flex items-center justify-center gap-2 border-2 border-[#1A6BFF] text-[#1A6BFF] rounded-xl py-3 text-sm font-medium hover:bg-blue-50 transition-colors mb-4"
+        >
+          <ClipboardList size={16} />
+          Use Sample Transcript
+        </button>
+
+        {/* Sample loaded banner */}
+        {sampleLoaded && (
+          <div className="mb-3 px-4 py-2.5 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 font-medium">
+            ✅ Sample loaded — this is a real inbound dental call. Click Analyze Call to score it.
+          </div>
+        )}
+
+        {/* Sample metadata strip */}
+        {sampleLoaded && (
+          <div className="mb-3 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 flex items-center gap-1.5 flex-wrap">
+            <span>📋 Sample call</span>
+            <span className="text-gray-300">•</span>
+            <span>Bright Smile Dental</span>
+            <span className="text-gray-300">•</span>
+            <span>Inbound</span>
+            <span className="text-gray-300">•</span>
+            <span>3m 42s</span>
+            <span className="text-gray-300">•</span>
+            <span className="text-green-600 font-medium">Resolved</span>
+          </div>
+        )}
+
+        {/* Paste textarea */}
         <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-500 mb-2">Or paste transcript below</label>
+          <label className="block text-xs font-medium text-gray-500 mb-2">
+            {sampleLoaded ? 'Loaded transcript' : 'Or paste transcript below'}
+          </label>
           <textarea
             className="w-full border border-gray-200 rounded-xl p-3 text-sm text-gray-700 resize-none outline-none focus:border-[#1A6BFF] transition-colors h-32"
             placeholder="Paste call transcript here..."
             value={transcript}
-            onChange={e => setTranscript(e.target.value)}
+            onChange={e => { setTranscript(e.target.value); setSampleLoaded(false); }}
           />
         </div>
 
@@ -106,9 +243,10 @@ export default function CallQA() {
         )}
 
         <button
+          ref={analyzeRef}
           onClick={handleAnalyze}
           disabled={loading || !transcript.trim()}
-          className="flex items-center gap-2 bg-[#1A6BFF] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className={`flex items-center gap-2 bg-[#1A6BFF] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${analyzeGlow ? 'analyze-pulse' : ''}`}
         >
           {loading
             ? <><Loader2 size={15} className="animate-spin" />Analyzing call...</>
@@ -119,7 +257,6 @@ export default function CallQA() {
       {/* ── Results / Scorecard ── */}
       {result && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-6">
-          {/* Scorecard header */}
           <div className="flex items-center gap-6">
             <div className={`w-24 h-24 rounded-full flex flex-col items-center justify-center border-4 ${result.pass ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50'}`}>
               <span className={`text-3xl font-bold ${result.pass ? 'text-green-600' : 'text-red-500'}`}>{result.overall_score}</span>
@@ -138,7 +275,6 @@ export default function CallQA() {
             </div>
           </div>
 
-          {/* Categories */}
           <div className="space-y-3">
             {result.categories?.map(cat => (
               <div key={cat.name} className="flex items-center gap-3">
@@ -155,7 +291,6 @@ export default function CallQA() {
             ))}
           </div>
 
-          {/* Top Issue */}
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3">
             <AlertTriangle size={18} className="text-red-500 flex-shrink-0 mt-0.5" />
             <div>
@@ -164,7 +299,6 @@ export default function CallQA() {
             </div>
           </div>
 
-          {/* Recommendation */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
             <Lightbulb size={18} className="text-[#1A6BFF] flex-shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -206,7 +340,6 @@ export default function CallQA() {
           </LineChart>
         </ResponsiveContainer>
 
-        {/* Change Log */}
         <div className="mt-6">
           <div className="flex items-center gap-1.5 mb-3">
             <h3 className="text-sm font-semibold text-gray-700">Change Log</h3>
