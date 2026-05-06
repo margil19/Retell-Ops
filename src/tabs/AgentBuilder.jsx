@@ -180,6 +180,7 @@ export default function AgentBuilder() {
         <div className="flex items-center gap-1.5 mb-3">
           <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">KPI Dashboard</span>
           <InfoPopover
+            isFirst
             painPoint="Ops managers have no visibility into whether the agent is working"
             intent="Give the ops manager the 4 numbers that actually matter to them"
             whatItDoes="Shows resolution rate, transfer rate, handle time, and call volume updated in real time"

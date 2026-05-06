@@ -36,19 +36,76 @@ const DEFAULT_NODES = [
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
+  // ── Core app state ─────────────────────────────────────────────────────────
   const [nodes, setNodes] = useState(DEFAULT_NODES);
   const [currentScript, setCurrentScript] = useState('');
   const [qaScores, setQaScores] = useState(null);
   const [activeTab, setActiveTab] = useState('agent-builder');
-  const [pendingScript, setPendingScript] = useState(null); // script to inject into a node
+  const [pendingScript, setPendingScript] = useState(null);
+
+  // ── Onboarding state ───────────────────────────────────────────────────────
+  const [welcomeDismissed, setWelcomeDismissed] = useState(
+    () => localStorage.getItem('retell_ops_welcomed') === 'true'
+  );
+  const [showPulse, setShowPulse] = useState(false);
+  const [firstInfoClicked, setFirstInfoClicked] = useState(
+    () => localStorage.getItem('retell_ops_first_info_clicked') === 'true'
+  );
+  const [visitedTabs, setVisitedTabs] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('retell_ops_visited_tabs') || '[]'); }
+    catch { return []; }
+  });
+  const [guideDismissed, setGuideDismissed] = useState(
+    () => localStorage.getItem('retell_ops_guide_dismissed') === 'true'
+  );
+
+  // ── Onboarding actions ─────────────────────────────────────────────────────
+  function dismissWelcome() {
+    setWelcomeDismissed(true);
+    localStorage.setItem('retell_ops_welcomed', 'true');
+    // Start 30-second pulse only if user hasn't clicked an info icon yet
+    if (localStorage.getItem('retell_ops_first_info_clicked') !== 'true') {
+      setShowPulse(true);
+      setTimeout(() => setShowPulse(false), 30000);
+    }
+  }
+
+  function markInfoClicked() {
+    if (!firstInfoClicked) {
+      setFirstInfoClicked(true);
+      setShowPulse(false);
+      localStorage.setItem('retell_ops_first_info_clicked', 'true');
+    }
+  }
+
+  function markTabVisited(tab) {
+    setVisitedTabs(prev => {
+      if (prev.includes(tab)) return prev;
+      const next = [...prev, tab];
+      localStorage.setItem('retell_ops_visited_tabs', JSON.stringify(next));
+      return next;
+    });
+  }
+
+  function dismissGuide() {
+    setGuideDismissed(true);
+    localStorage.setItem('retell_ops_guide_dismissed', 'true');
+  }
 
   return (
     <AppContext.Provider value={{
+      // Core
       nodes, setNodes,
       currentScript, setCurrentScript,
       qaScores, setQaScores,
       activeTab, setActiveTab,
       pendingScript, setPendingScript,
+      // Onboarding
+      welcomeDismissed, dismissWelcome,
+      showPulse,
+      firstInfoClicked, markInfoClicked,
+      visitedTabs, markTabVisited,
+      guideDismissed, dismissGuide,
     }}>
       {children}
     </AppContext.Provider>

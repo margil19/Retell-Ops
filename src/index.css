@@ -26,3 +26,16 @@
     scrollbar-width: thin;
   }
 }
+
+/* ── Info icon pulse animation ────────────────────────────────────────────── */
+@keyframes info-ripple {
+  0%   { box-shadow: 0 0 0 0 rgba(26, 107, 255, 0.55); }
+  65%  { box-shadow: 0 0 0 7px rgba(26, 107, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(26, 107, 255, 0); }
+}
+
+.info-pulse-ring {
+  animation: info-ripple 1.8s ease-out infinite;
+  border-radius: 50%;
+  color: #1A6BFF;
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, CheckCircle, AlertTriangle, XCircle, Download, ArrowRight } from 'lucide-react';
+import { Loader2, CheckCircle, AlertTriangle, XCircle, Download, ArrowRight, X } from 'lucide-react';
 import { callClaude, parseJSON } from '../lib/claude';
 import { useApp } from '../context/AppContext';
 import InfoPopover from '../components/InfoPopover';
@@ -54,6 +54,9 @@ export default function ScriptEditor() {
   const { setActiveTab, setPendingScript, nodes } = useApp();
   const [input, setInput] = useState('');
   const [industry, setIndustry] = useState('Healthcare');
+  const [templateBannerDismissed, setTemplateBannerDismissed] = useState(
+    () => localStorage.getItem('retell_ops_script_banner_dismissed') === 'true'
+  );
   const [tone, setTone] = useState('Professional');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -121,6 +124,25 @@ export default function ScriptEditor() {
             />
           </div>
         </div>
+
+        {/* First-visit template callout banner */}
+        {!templateBannerDismissed && (
+          <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+            <span className="text-sm flex-1 text-amber-800 leading-relaxed">
+              👇 Start here — try the risky template first to see compliance flags in action, then run the clean one to see a perfect pass
+            </span>
+            <button
+              onClick={() => {
+                setTemplateBannerDismissed(true);
+                localStorage.setItem('retell_ops_script_banner_dismissed', 'true');
+              }}
+              className="flex-shrink-0 text-amber-500 hover:text-amber-700 transition-colors mt-0.5"
+              aria-label="Dismiss"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        )}
 
         {/* Templates */}
         <div className="mb-5">
