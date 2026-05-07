@@ -6,6 +6,7 @@ import GuidedSteps from './components/GuidedSteps';
 import AgentBuilder from './tabs/AgentBuilder';
 import CallQA from './tabs/CallQA';
 import ScriptEditor from './tabs/ScriptEditor';
+import { Analytics } from '@vercel/analytics/react';
 import './index.css';
 
 function TabRouter() {
@@ -45,6 +46,7 @@ export default function App() {
   return (
     <AppProvider>
       <AppShell />
+      <Analytics />
     </AppProvider>
   );
 }
